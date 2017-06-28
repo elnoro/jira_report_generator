@@ -1,0 +1,88 @@
+# Learn more about services, parameters and containers at
+# https://symfony.com/doc/current/service_container.html
+parameters:
+    #parameter_name: value
+
+services:
+    # default configuration for services in *this* file
+    _defaults:
+        # automatically injects dependencies in your services
+        autowire: false
+        # automatically registers your services as commands, event subscribers, etc.
+        autoconfigure: false
+        # this means you cannot fetch services directly from the container via $container->get()
+        # if you need to do this, you can override this setting on individual services
+        public: false
+
+    # JIRA
+
+    app.jira.dashboard.dashboard:
+        class: AppBundle\Jira\Dashboard\Dashboard
+        arguments: ['@app.jira.api.client']
+
+    app.jira.api.client:
+        class: AppBundle\Jira\API\RestClient
+        factory: [AppBundle\Jira\API\RestClient, 'connect']
+        arguments: ['@app.jira.api.jira_access_parameters']
+        public: false
+
+    app.jira_api.caching_client:
+        class: AppBundle\Jira\API\CachingClient
+        decorates: app.jira.api.client
+        arguments: ['@app.jira_api.caching_client.inner']
+        public: false
+
+    app.jira.api.jira_access_parameters:
+        class: AppBundle\Jira\API\JiraAccessParameters
+        factory: [AppBundle\Jira\API\JiraAccessParameters, 'fromArray']
+        arguments: ['%jira%']
+
+    # JIRA monthly report
+
+    app.jira_monthly_report_pipeline.report_pipeline:
+        class: AppBundle\Jira\MonthlyReport\Pipeline\ReportPipeline
+        arguments:
+            - '@app.jira.monthly_report.pipeline.download_issues_from_jira'
+            - '@app.jira.monthly_report.pipeline.suggest_new_relic_description'
+            - '@app.jira_monthly_report_pipeline.translate_description_stage'
+            - '@app.jira_monthly_report_pipeline.generate_report_file'
+        public: true
+
+    app.jira_monthly_report_pipeline.generate_report_file:
+        class: AppBundle\Jira\MonthlyReport\Pipeline\GenerateReportFile
+        arguments: ['%reports_dir%']
+
+    app.jira.monthly_report.pipeline.suggest_new_relic_description:
+        class: AppBundle\Jira\MonthlyReport\Pipeline\SuggestNewRelicDescription
+
+    app.jira_monthly_report_pipeline.translate_description_stage:
+        class: AppBundle\Jira\MonthlyReport\Pipeline\TranslateDescriptions
+        arguments: ['@app.translator']
+
+    app.jira.monthly_report.pipeline.download_issues_from_jira:
+        class: AppBundle\Jira\MonthlyReport\Pipeline\DownloadIssuesFromJira
+        arguments:
+            - '@app.jira.api.client'
+            - '@app.jira.monthly_report.period_query_provider'
+            - '@app.jira.montly_report.period_calculator'
+
+    app.jira.monthly_report.period_query_provider:
+        class: AppBundle\Jira\MonthlyReport\Query\PeriodQueryProvider
+        arguments: ['@app.jira.montly_report.period_calculator']
+        public: false
+
+    app.jira.montly_report.period_calculator:
+        class: AppBundle\Jira\MonthlyReport\PeriodCalculator\MonthCalculator
+        factory: [AppBundle\Jira\MonthlyReport\PeriodCalculator\MonthCalculator, 'createWithInternalClock']
+        public: false
+
+    app.translator:
+        class: AppBundle\Translation\API\YandexTranslator
+        factory: [AppBundle\Translation\API\YandexTranslator, 'connect']
+        arguments: ['@app.translation.yandex.connection_parameters']
+        public: false
+
+    app.translation.yandex.connection_parameters:
+        class: AppBundle\DTO\ConnectionParameters
+        arguments: ['%yandex_translate.url%', '%yandex_translate.token%']
+        public: false
