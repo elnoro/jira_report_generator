@@ -1,7 +1,7 @@
 jira_report_generator
 =====================
 
-Automates monthly reports from JIRA
+Automates getting monthly reports from JIRA.
 
 How to use:
 
@@ -13,3 +13,7 @@ docker run -e JIRA_USER=username \
     -v $PWD:/code/reports \
     --name=jrd --rm kertis/jira_report_generator
 ```
+
+The project uses [Yandex Translate API](https://translate.yandex.ru/developers).
+
+[Obtain API Key here](https://translate.yandex.ru/developers/keys)
